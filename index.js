@@ -1,5 +1,5 @@
 import { Client, ButtonBuilder, ActionRowBuilder, SlashCommandBuilder, GatewayIntentBits, ButtonStyle } from 'discord.js';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, closeSync, openSync } from 'fs';
 import { schedule } from "node-cron";
 import 'dotenv/config';
 import { REST } from '@discordjs/rest';
@@ -11,6 +11,7 @@ const {
     token,
     channel,
     pathPeoplePizza,
+    pathPizzaList,
     applicationId
 } = process.env;
 
@@ -33,11 +34,8 @@ client.on('interactionCreate', async interaction => {
             request = readFileSync(pathPeoplePizza, 'utf-8');
 
             if (!request) {
-                res.push([]);
-                await interaction.reply(`
-                    :white_check_mark: :white_check_mark: L'initialisation de la commande de pizza a été créée :white_check_mark: :white_check_mark:
-                    :pizza: :pizza: Pour vous inscrire, tapez **/addMe** :pizza: :pizza: 
-                `);
+                writeFileSync(pathPeoplePizza, JSON.stringify([]));
+                await interaction.reply(":white_check_mark: :white_check_mark: L'initialisation de la commande de pizza a été créée :white_check_mark: :white_check_mark:\n:pizza: :pizza: Pour vous inscrire, tapez **/addMe** :pizza: :pizza:");
                 return;
             }
 
@@ -95,10 +93,10 @@ client.on('interactionCreate', async interaction => {
             let list = '';
 
             res.forEach((elem) => {
-                list += elem.user + '\n';
+                list += `- ${elem.user}\n`
             });
 
-            list += `**il y a ${res.length} personnes dans la liste.**`;
+            list += `**il y a ${res.length} personne(s) dans la liste.**`;
 
             await interaction.reply(list);
 
@@ -107,14 +105,53 @@ client.on('interactionCreate', async interaction => {
             writeFileSync(pathPeoplePizza, JSON.stringify());
 
             break;
+        case 'listpizza':
+            request = readFileSync(pathPizzaList, 'utf-8');
+
+            if (!request) {
+                await interaction.reply(":x: :x: Aucune pizza existe :x: :x:");
+                return;
+            }
+
+            res = JSON.parse(request);
+
+            const pizzaFormater = (pizza) => {
+                return new ButtonBuilder()
+                    .setCustomId('pizza')
+                    .setLabel(pizza)
+                    .setStyle(ButtonStyle.Primary);
+            }
+
+            const row = new ActionRowBuilder();
+
+            res.forEach((elem) => {
+                row.addComponents(pizzaFormater(elem.pizza));
+            });
+
+            await interaction.reply({
+                content: `Quel pizza voulez-vous ?`,
+                components: [row],
+            });
+
+
+            break;
+        default:
+            interaction.reply("Commande inconnue");
+
+            break;
     }
 });
 
 const onReady = async () => {
+    //creation des fichiers .json
     if (!existsSync(pathPeoplePizza)) {
-        //creation des fichiers .json
-        writeFileSync(pathPeoplePizza, JSON.stringify([]));
+        closeSync(openSync(pathPeoplePizza, 'w'))
         console.log(`${pathPeoplePizza} people-pizza.json created.`);
+    }
+
+    if (!existsSync(pathPizzaList)) {
+        closeSync(openSync(pathPizzaList, 'w'))
+        console.log(`${pathPizzaList} pizza-list.json created.`);
     }
 
     const commands = [

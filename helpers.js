@@ -1,5 +1,7 @@
+import { readFileSync } from "fs";
+
 export const requestPeoplePizza = async (path, interaction) => {
-    const request = readFileSync(pathPeoplePizza);
+    const request = readFileSync(path);
 
     if (!request) {
         await interaction.reply(`
