@@ -23,11 +23,13 @@ const client = new Client({
     ]
 });
 
+let pizzaList;
+
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
     const { commandName } = interaction;
-    let request, res;
+    let request, res, indexPeople;
 
     switch (commandName) {
         case 'createpizzacommand':
@@ -93,7 +95,7 @@ client.on('interactionCreate', async interaction => {
             let list = '';
 
             res.forEach((elem) => {
-                list += `- ${elem.user}\n`
+                list += `- ${elem.user} ${elem.pizza.length ? `-** ${elem.pizza.map((pizza) => pizzaList.find((elem) => elem.id === pizza).nom).join(', ')}**` : ''}\n`;
             });
 
             list += `**il y a ${res.length} personne(s) dans la liste.**`;
@@ -106,15 +108,6 @@ client.on('interactionCreate', async interaction => {
 
             break;
         case 'listpizza':
-            request = readFileSync(pathPizzaList, 'utf-8');
-
-            if (!request) {
-                await interaction.reply(":x: :x: Aucune pizza existe :x: :x:");
-                return;
-            }
-
-            res = JSON.parse(request);
-
             const embedListPizza = {
                 "title": "Liste des pizzas",
                 "description": "Voici la liste des pizzas disponibles",
@@ -122,14 +115,77 @@ client.on('interactionCreate', async interaction => {
                 "fields": []
             };
 
-            res.forEach((elem) => {
+            pizzaList.forEach((elem) => {
                 embedListPizza.fields.push({
-                    "name": elem.nom,
+                    "name": `${elem.id} -- ${elem.nom}`,
                     "value": elem.contenance
                 });
             });
 
             await interaction.reply({ embeds: [embedListPizza] });
+
+            break;
+        case 'choosepizza':
+            request = readFileSync(pathPeoplePizza, 'utf-8');
+
+            if (!request) {
+                await interaction.reply(":x: :x: La commande de pizza n'a pas été créée :x: :x:\nPour créer la commande de pizza, tapez **/createPizzaCommand**");
+                return;
+            }
+
+            res = JSON.parse(request);
+
+            const params = interaction.options.get('pizzaid').value;
+
+            const pizza = pizzaList.find((elem) => elem.id === params);
+
+            if (!pizza) {
+                await interaction.reply(":x: :x: La pizza n'existe pas :x: :x:");
+                return;
+            }
+
+            indexPeople = res.findIndex((elem) => elem.user === interaction.user.tag);
+            
+            if (indexPeople === -1) {
+                await interaction.reply(":x: :x: @" + interaction.user.tag + " n'est pas dans la liste pour la commande d'aujourd'hui. :x: :x: ");
+                return;
+            }
+
+            res[indexPeople].pizza.push(pizza.id);
+
+            writeFileSync(pathPeoplePizza, JSON.stringify(res));
+
+            const embedChoosePizza = {
+                "title": "Choix de la pizza",
+                "description": "Voici la pizza choisie",
+                "color": 16711680,
+                "fields": [
+                    {
+                        "name": pizza.nom,
+                        "value": pizza.contenance
+                    }
+                ]
+            };
+
+            await interaction.reply({ embeds: [embedChoosePizza] });
+
+            break;
+        case 'deletemypizza':
+            res = await requestPeoplePizza(pathPeoplePizza, interaction);
+            if (!res) return;
+
+            indexPeople = res.findIndex((elem) => elem.user === interaction.user.tag);
+
+            if (indexPeople === -1) {
+                await interaction.reply(":x: :x: @" + interaction.user.tag + " n'est pas dans la liste pour la commande d'aujourd'hui. :x: :x: ");
+                return;
+            }
+
+            res[indexPeople].pizza = [];
+
+            writeFileSync(pathPeoplePizza, JSON.stringify(res));
+
+            await interaction.reply(":white_check_mark: :white_check_mark: @" + interaction.user.tag + " a supprimé sa pizza de la liste pour la commande de pizzas d'aujourd'hui :white_check_mark: :white_check_mark: ");
 
             break;
         case 'helpcommands':
@@ -148,7 +204,7 @@ client.on('interactionCreate', async interaction => {
                     },
                     {
                         "name": "/listPeople",
-                        "value": "Lister les personnes qui participent à la commande de pizza"
+                        "value": "Lister les personnes qui participent à la commande de pizza avec les pizzas choisies"
                     },
                     {
                         "name": "/createPizzaCommand",
@@ -165,6 +221,14 @@ client.on('interactionCreate', async interaction => {
                     {
                         "name": "/helpCommands",
                         "value": "Lister les commandes"
+                    },
+                    {
+                        "name": "/choosePizza",
+                        "value": "Choisir une pizza"
+                    },
+                    {
+                        "name": "/deleteMyPizza",
+                        "value": "Supprimer votre pizza de la liste pour la commande de pizzas d'aujourd'hui"
                     }
                 ]
             };
@@ -191,6 +255,9 @@ const onReady = async () => {
         console.log(`${pathPizzaList} pizza-list.json created.`);
     }
 
+    const request = readFileSync(pathPizzaList, 'utf-8');
+    pizzaList = JSON.parse(request); 
+
     const commands = [
         new SlashCommandBuilder()
             .setName('addme')
@@ -200,7 +267,7 @@ const onReady = async () => {
             .setDescription("Se désinscrire de la prochaine commande de pizza"),
         new SlashCommandBuilder()
             .setName('listpeople')
-            .setDescription("Liste les personnes qui participent à la commande de pizza"),
+            .setDescription("Liste les personnes qui participent à la commande de pizza avec les pizzas choisies"),
         new SlashCommandBuilder()
             .setName('createpizzacommand')
             .setDescription("Créer la commande de pizza"),
@@ -212,7 +279,18 @@ const onReady = async () => {
             .setDescription("liste les pizzas"),
         new SlashCommandBuilder()
             .setName('helpcommands')
-            .setDescription("Liste les commandes")
+            .setDescription("Liste les commandes"),
+        new SlashCommandBuilder()
+            .setName('choosepizza')
+            .setDescription("Choisir une pizza")
+            .addIntegerOption(option =>
+                option.setName('pizzaid')
+                    .setDescription('ID de la pizza')
+                    .setRequired(true)
+            ),
+        new SlashCommandBuilder()
+            .setName('deletemypizza')
+            .setDescription("Supprimer votre pizza de la liste pour la commande de pizzas d'aujourd'hui")
     ]
         .map(command => command.toJSON());
 
