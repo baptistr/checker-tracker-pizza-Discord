@@ -1,4 +1,4 @@
-import { Client, ButtonBuilder, ActionRowBuilder, SlashCommandBuilder, GatewayIntentBits, ButtonStyle } from 'discord.js';
+import { Client, ActionRowBuilder, SlashCommandBuilder, GatewayIntentBits } from 'discord.js';
 import { readFileSync, writeFileSync, existsSync, closeSync, openSync } from 'fs';
 import { schedule } from "node-cron";
 import 'dotenv/config';
@@ -115,24 +115,61 @@ client.on('interactionCreate', async interaction => {
 
             res = JSON.parse(request);
 
-            const pizzaFormater = (pizza) => {
-                return new ButtonBuilder()
-                    .setCustomId('pizza')
-                    .setLabel(pizza)
-                    .setStyle(ButtonStyle.Primary);
-            }
-
-            const row = new ActionRowBuilder();
+            const embedListPizza = {
+                "title": "Liste des pizzas",
+                "description": "Voici la liste des pizzas disponibles",
+                "color": 16711680,
+                "fields": []
+            };
 
             res.forEach((elem) => {
-                row.addComponents(pizzaFormater(elem.pizza));
+                embedListPizza.fields.push({
+                    "name": elem.nom,
+                    "value": elem.contenance
+                });
             });
 
-            await interaction.reply({
-                content: `Quel pizza voulez-vous ?`,
-                components: [row],
-            });
+            await interaction.reply({ embeds: [embedListPizza] });
 
+            break;
+        case 'helpcommands':
+            const embed = {
+                "title": "Liste des commandes",
+                "description": "Voici la liste des commandes disponibles",
+                "color": 16711680,
+                "fields": [
+                    {
+                        "name": "/addMe",
+                        "value": "Ajouter votre nom à la liste des personnes qui participent à la commande de pizza"
+                    },
+                    {
+                        "name": "/delMe",
+                        "value": "Supprimer votre nom de la liste des personnes qui participent à la commande de pizza"
+                    },
+                    {
+                        "name": "/listPeople",
+                        "value": "Lister les personnes qui participent à la commande de pizza"
+                    },
+                    {
+                        "name": "/createPizzaCommand",
+                        "value": "Créer la commande de pizza"
+                    },
+                    {
+                        "name": "/deletePizzaCommand",
+                        "value": "Supprimer la commande de pizza"
+                    },
+                    {
+                        "name": "/listPizza",
+                        "value": "Lister les pizzas"
+                    },
+                    {
+                        "name": "/helpCommands",
+                        "value": "Lister les commandes"
+                    }
+                ]
+            };
+
+            await interaction.reply({ embeds: [embed] });
 
             break;
         default:
@@ -172,7 +209,10 @@ const onReady = async () => {
             .setDescription("Supprimer la commande de pizza"),
         new SlashCommandBuilder()
             .setName('listpizza')
-            .setDescription("liste les pizzas")
+            .setDescription("liste les pizzas"),
+        new SlashCommandBuilder()
+            .setName('helpcommands')
+            .setDescription("Liste les commandes")
     ]
         .map(command => command.toJSON());
 
