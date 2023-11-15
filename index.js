@@ -9,7 +9,6 @@ import { requestPeoplePizza } from './helpers.js';
 
 const {
     token,
-    channel,
     pathPeoplePizza,
     pathPizzaList,
     applicationId
@@ -104,8 +103,9 @@ client.on('interactionCreate', async interaction => {
 
             break;
         case 'deletepizzacommand':
-            writeFileSync(pathPeoplePizza, JSON.stringify());
+            closeSync(openSync(pathPeoplePizza, 'w'))
 
+            await interaction.reply(":white_check_mark: :white_check_mark: La commande de pizza a été supprimée :white_check_mark: :white_check_mark: ");
             break;
         case 'listpizza':
             const embedListPizza = {
@@ -126,20 +126,14 @@ client.on('interactionCreate', async interaction => {
 
             break;
         case 'choosepizza':
-            request = readFileSync(pathPeoplePizza, 'utf-8');
-
-            if (!request) {
-                await interaction.reply(":x: :x: La commande de pizza n'a pas été créée :x: :x:\nPour créer la commande de pizza, tapez **/createPizzaCommand**");
-                return;
-            }
-
-            res = JSON.parse(request);
+            res = await requestPeoplePizza(pathPeoplePizza, interaction);
+            if (!res) return;
 
             const params = interaction.options.get('pizzaid').value;
 
             const pizza = pizzaList.find((elem) => elem.id === params);
 
-            if (!pizza) {
+            if (!pizza) {   
                 await interaction.reply(":x: :x: La pizza n'existe pas :x: :x:");
                 return;
             }
@@ -147,11 +141,15 @@ client.on('interactionCreate', async interaction => {
             indexPeople = res.findIndex((elem) => elem.user === interaction.user.tag);
             
             if (indexPeople === -1) {
-                await interaction.reply(":x: :x: @" + interaction.user.tag + " n'est pas dans la liste pour la commande d'aujourd'hui. :x: :x: ");
-                return;
+                res.push({
+                    user: interaction.user.tag,
+                    pizza: [pizza.id]
+                });
+                await interaction.reply(":white_check_mark: :white_check_mark: @" + interaction.user.tag + " a été ajouté à la liste pour la commande de pizzas d'aujourd'hui :white_check_mark: :white_check_mark: ");
+                
+            } else {
+                res[indexPeople].pizza.push(pizza.id);
             }
-
-            res[indexPeople].pizza.push(pizza.id);
 
             writeFileSync(pathPeoplePizza, JSON.stringify(res));
 
@@ -219,16 +217,16 @@ client.on('interactionCreate', async interaction => {
                         "value": "Lister les pizzas"
                     },
                     {
-                        "name": "/helpCommands",
-                        "value": "Lister les commandes"
-                    },
-                    {
                         "name": "/choosePizza",
                         "value": "Choisir une pizza"
                     },
                     {
                         "name": "/deleteMyPizza",
                         "value": "Supprimer votre pizza de la liste pour la commande de pizzas d'aujourd'hui"
+                    },
+                    {
+                        "name": "/helpCommands",
+                        "value": "Lister les commandes"
                     }
                 ]
             };
